@@ -3,7 +3,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
+import pytesseract
+from PIL import Image
+from pdf2image import convert_from_path
 
+pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 # Model ek baar load hota hai, baar baar nahi (taake fast rahe)
 print("Loading embedding model...")
 embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
@@ -84,4 +88,13 @@ def extract_text_from_docx(docx_path: str) -> str:
     for para in doc.paragraphs:
         if para.text:
             full_text += para.text + "\n"
+    return full_text
+
+def extract_text_from_scanned_pdf(pdf_path: str) -> str:
+    """Scanned PDF se OCR ke zariye text nikalta hai"""
+    images = convert_from_path(pdf_path)
+    full_text = ""
+    for image in images:
+        text = pytesseract.image_to_string(image)
+        full_text += text + "\n"
     return full_text

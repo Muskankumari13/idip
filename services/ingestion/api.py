@@ -3,15 +3,18 @@ from fastapi.responses import JSONResponse
 import tempfile, os, uuid
 from openai import OpenAI
 from dotenv import load_dotenv
-load_dotenv()
-from main import extract_text_from_pdf, extract_text_from_docx, chunk_text, create_embeddings, build_faiss_index, search_index
+
+load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
+
+from main import extract_text_from_pdf, extract_text_from_docx, extract_text_from_scanned_pdf, chunk_text, create_embeddings, build_faiss_index, search_index
 
 app = FastAPI()
 
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
+    api_key=api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1"
 )
+
 document_store = {}
 
 @app.post("/ingest")
@@ -25,6 +28,8 @@ async def ingest_document(file: UploadFile = File(...)):
         text = extract_text_from_docx(tmp_path)
     else:
         text = extract_text_from_pdf(tmp_path)
+        if len(text.strip()) < 100:
+            text = extract_text_from_scanned_pdf(tmp_path)
 
     chunks = chunk_text(text)
     embeddings = create_embeddings(chunks)
