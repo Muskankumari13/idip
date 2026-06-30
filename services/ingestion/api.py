@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import JSONResponse
-import tempfile, os, uuid
+import tempfile, os, uuid, sys
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -8,10 +8,13 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.en
 
 from main import extract_text_from_pdf, extract_text_from_docx, extract_text_from_scanned_pdf, chunk_text, create_embeddings, build_faiss_index, search_index
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classifier'))
+from classifier import classify_document
+
 app = FastAPI()
 
 client = OpenAI(
-    api_key=api_key=os.getenv("GROQ_API_KEY"),
+    api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1"
 )
 
@@ -35,11 +38,18 @@ async def ingest_document(file: UploadFile = File(...)):
     embeddings = create_embeddings(chunks)
     index = build_faiss_index(embeddings)
 
+    classification = classify_document(text)
+
     doc_id = str(uuid.uuid4())
     document_store[doc_id] = {"chunks": chunks, "index": index}
     os.unlink(tmp_path)
 
-    return JSONResponse({"doc_id": doc_id, "chunks_created": len(chunks)})
+    return JSONResponse({
+        "doc_id": doc_id,
+        "chunks_created": len(chunks),
+        "document_type": classification["document_type"],
+        "type_confidence": classification["confidence"]
+    })
 
 
 @app.post("/ask")
