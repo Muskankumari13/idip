@@ -11,10 +11,13 @@ from main import extract_text_from_pdf, extract_text_from_docx, extract_text_fro
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classifier'))
 from classifier import classify_document
 
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'risk_scoring'))
+from risk_scorer import calculate_risk_score
+
 app = FastAPI()
 
 client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
+    api_key="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",
     base_url="https://api.groq.com/openai/v1"
 )
 
@@ -39,6 +42,7 @@ async def ingest_document(file: UploadFile = File(...)):
     index = build_faiss_index(embeddings)
 
     classification = classify_document(text)
+    risk_analysis = calculate_risk_score(text, classification["document_type"])
 
     doc_id = str(uuid.uuid4())
     document_store[doc_id] = {"chunks": chunks, "index": index}
@@ -48,7 +52,10 @@ async def ingest_document(file: UploadFile = File(...)):
         "doc_id": doc_id,
         "chunks_created": len(chunks),
         "document_type": classification["document_type"],
-        "type_confidence": classification["confidence"]
+        "type_confidence": classification["confidence"],
+        "risk_score": risk_analysis["risk_score"],
+        "risk_level": risk_analysis["risk_level"],
+        "risk_flags": risk_analysis["flags"]
     })
 
 
