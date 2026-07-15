@@ -1,0 +1,22 @@
+services:
+  - name: idip-api
+    type: web
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+    healthCheckPath: /docs
+
+  - name: idip-ui
+    type: web
+    runtime: python
+    buildCommand: pip install gradio requests python-dotenv
+    startCommand: python app.py
+    envVars:
+      - key: API_URL
+        fromService:
+          name: idip-api
+          type: web
+          property: host
+          envVarKey: API_URL
