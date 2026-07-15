@@ -17,12 +17,16 @@ from risk_scorer import calculate_risk_score
 
 app = FastAPI()
 
-client = OpenAI(
-    api_key=os.getenv("GROQ_API_KEY"),
-    base_url="https://api.groq.com/openai/v1"
-)
-
 document_store = {}
+
+def _get_client():
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise RuntimeError("GROQ_API_KEY environment variable is not set.")
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://api.groq.com/openai/v1"
+    )
 
 @app.post("/ingest")
 async def ingest_document(file: UploadFile = File(...)):
@@ -78,6 +82,7 @@ async def ask_question(doc_id: str, question: str):
 
         context = "\n\n".join([r["chunk"] for r in results])
 
+        client = _get_client()
         response = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
