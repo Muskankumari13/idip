@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'))
 
+sys.path.append(os.path.join(os.path.dirname(__file__)))
 from main import extract_text_from_pdf, extract_text_from_docx, extract_text_from_scanned_pdf, chunk_text, create_embeddings, build_faiss_index, search_index
 
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'classifier'))
@@ -17,7 +18,7 @@ from risk_scorer import calculate_risk_score
 app = FastAPI()
 
 client = OpenAI(
-    api_key="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",
+    api_key=os.getenv("GROQ_API_KEY"),
     base_url="https://api.groq.com/openai/v1"
 )
 
@@ -61,34 +62,38 @@ async def ingest_document(file: UploadFile = File(...)):
 
 @app.post("/ask")
 async def ask_question(doc_id: str, question: str):
-    if doc_id not in document_store:
-        return JSONResponse({"error": "doc_id not found"}, status_code=404)
+    try:
+        if doc_id not in document_store:
+            return JSONResponse({"error": "doc_id not found"}, status_code=404)
 
-    data = document_store[doc_id]
-    results = search_index(data["index"], question, data["chunks"], k=3)
+        data = document_store[doc_id]
+        results = search_index(data["index"], question, data["chunks"], k=3)
 
-    if results[0]["distance"] > 1.8:
+        if results[0]["distance"] > 1.8:
+            return JSONResponse({
+                "question": question,
+                "answer": "I don't have enough information in the document to answer this.",
+                "confidence": "low"
+            })
+
+        context = "\n\n".join([r["chunk"] for r in results])
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": "Answer the question using only the provided context. Be concise."},
+                {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
+            ]
+        )
+
+        answer = response.choices[0].message.content
+
         return JSONResponse({
             "question": question,
-            "answer": "I don't have enough information in the document to answer this.",
-            "confidence": "low"
+            "answer": answer,
+            "confidence": "high",
+            "sources": [r["chunk"][:100] for r in results]
         })
-
-    context = "\n\n".join([r["chunk"] for r in results])
-
-    response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {"role": "system", "content": "Answer the question using only the provided context. Be concise."},
-            {"role": "user", "content": f"Context:\n{context}\n\nQuestion: {question}"}
-        ]
-    )
-
-    answer = response.choices[0].message.content
-
-    return JSONResponse({
-        "question": question,
-        "answer": answer,
-        "confidence": "high",
-        "sources": [r["chunk"][:100] for r in results]
-    })
+    except Exception as e:
+        import traceback
+        return JSONResponse({"error": str(e), "traceback": traceback.format_exc()}, status_code=500)
