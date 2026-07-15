@@ -1,3 +1,14 @@
+---
+title: IDIP
+emoji: 📄
+colorFrom: blue
+colorTo: indigo
+sdk: gradio
+sdk_version: "5.0.0"
+app_file: app.py
+pinned: false
+---
+
 # IDIP — Intelligent Document Intelligence Platform
 
 A production-grade RAG (Retrieval-Augmented Generation) system that ingests documents and answers questions using semantic search and LLMs.

@@ -1,6 +1,25 @@
 import gradio as gr
 import requests
 import os
+import sys
+import threading
+import time
+
+# ---------------------------------------------------------------------------
+# Start FastAPI in a background thread when API_URL is not externally set.
+# This is required for HuggingFace Spaces (single-process environment).
+# ---------------------------------------------------------------------------
+if not os.getenv("API_URL"):
+    import uvicorn
+    def _start_api():
+        uvicorn.run(
+            "services.ingestion.api:app",
+            host="0.0.0.0",
+            port=8000,
+            log_level="warning"
+        )
+    threading.Thread(target=_start_api, daemon=True).start()
+    time.sleep(5)   # wait for the server to be ready
 
 API_URL = os.getenv("API_URL", "http://127.0.0.1:8000")
 
